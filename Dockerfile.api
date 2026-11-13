@@ -1,0 +1,15 @@
+FROM node:24.13.1-bookworm-slim AS build
+WORKDIR /app
+COPY package*.json ./
+COPY apps/api/package.json apps/api/package.json
+COPY apps/web/package.json apps/web/package.json
+COPY packages/shared-types/package.json packages/shared-types/package.json
+RUN npm ci
+COPY . .
+RUN npm run build -w @garmentflow/api
+FROM node:24.13.1-bookworm-slim
+WORKDIR /app
+COPY --from=build --chown=node:node /app /app
+USER node
+EXPOSE 5000
+CMD ["node","apps/api/dist/server.js"]

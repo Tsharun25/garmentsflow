@@ -1,20 +1,24 @@
 # GarmentFlow ERP — Agent Instructions
 
 ## Project mission
+
 Build GarmentFlow ERP, a reliable garment manufacturing ERP for Woven and Knit factories. The same codebase must support:
+
 1. A single-business licensed deployment.
 2. A multi-tenant SaaS deployment.
 
 ## Technology
+
 - Frontend: React, TypeScript, Vite, Tailwind CSS.
 - Backend: Node.js, Express, TypeScript.
-- Database: MongoDB with Mongoose.
+- Database: PostgreSQL with node-postgres; versioned SQL migrations and forced RLS.
 - Validation: Zod.
 - Data fetching: TanStack Query.
 - Background jobs: Redis and BullMQ when required.
 - Deployment: Docker-based deployment, with production secrets kept outside source control.
 
 ## Working rules
+
 1. Inspect the existing code before changing anything.
 2. Do not replace working architecture without explaining why and asking first.
 3. Work in small, reviewable steps. Do not generate the whole ERP in one response.
@@ -27,6 +31,7 @@ Build GarmentFlow ERP, a reliable garment manufacturing ERP for Woven and Knit f
 10. Keep naming consistent and code readable for a developer learning the project.
 
 ## Multi-tenant security — critical
+
 1. Every tenant-owned database record must have a `tenantId`.
 2. Never trust a tenantId supplied by the browser or request body.
 3. Determine the tenant from the authenticated, validated server-side user/session context.
@@ -37,6 +42,7 @@ Build GarmentFlow ERP, a reliable garment manufacturing ERP for Woven and Knit f
 8. Do not create an endpoint that bypasses tenant scoping for convenience.
 
 ## Authentication and permissions
+
 - Use secure, HttpOnly cookies for session/refresh credentials where appropriate.
 - Never store authentication tokens in localStorage.
 - Use password hashing such as Argon2id or bcrypt with appropriate settings.
@@ -47,6 +53,7 @@ Build GarmentFlow ERP, a reliable garment manufacturing ERP for Woven and Knit f
 - Do not log passwords, tokens, cookies, database URIs, or secrets.
 
 ## Garment domain
+
 - Support both Woven and Knit workflows through configurable process routing.
 - Avoid duplicating the entire application for Woven and Knit.
 - Keep production, inventory, quality, costing, commercial, and shipment data traceable.
@@ -54,17 +61,24 @@ Build GarmentFlow ERP, a reliable garment manufacturing ERP for Woven and Knit f
 - Preserve audit history for important business actions.
 
 ## Data and API
+
 - Validate all external input on the server.
 - Use consistent API response and error formats.
 - Use pagination and filtering for large lists.
-- Use MongoDB transactions for operations that must succeed or fail together, where supported.
+- Use PostgreSQL transactions on a single pooled connection for business commands and transaction-local tenant context.
 - Add indexes based on actual query patterns.
 - Keep secrets in environment variables and never commit `.env` files.
 
 ## Before finishing a task
+
 Report:
+
 1. What changed.
 2. Which files changed.
 3. Important design decisions.
 4. Commands/tests actually run and their real results.
 5. Any known limitations or follow-up work.
+
+## Updated product brief (owner authorized 2026-11-13)
+
+Follow docs/PRODUCT_BRIEF.md. Preserve the sample dashboard. Deliver one verified vertical slice at a time; record unverified exit criteria in docs/PROGRESS.md. Runtime roles must not own tenant tables or bypass RLS. Factory and tenant scopes must be enforced independently.

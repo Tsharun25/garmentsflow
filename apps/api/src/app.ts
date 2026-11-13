@@ -1,6 +1,13 @@
 import express from 'express';
 import helmet from 'helmet';
-export function createApp(databaseReady: () => boolean) {
+import type { Pool } from 'pg';
+import { mountWorkspace } from './workspace-http.js';
+import { DomainError } from './identity.js';
+import { ZodError } from 'zod';
+export function createApp(
+  databaseReady: () => boolean,
+  workspace?: { pool: Pool; secret: string; origin: string; production: boolean },
+) {
   const app = express();
   app.disable('x-powered-by');
   app.use(helmet());
@@ -10,14 +17,54 @@ export function createApp(databaseReady: () => boolean) {
   });
   app.get('/api/v1/ready', (_req, res) => {
     const ready = databaseReady();
-    res.status(ready ? 200 : 503).json({ success: ready, data: { database: ready ? 'connected' : 'unavailable' } });
+    res
+      .status(ready ? 200 : 503)
+      .json({ success: ready, data: { database: ready ? 'connected' : 'unavailable' } });
   });
-  app.use((_req, res) => { res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Route not found' } }); });
+  if (workspace) mountWorkspace(app, workspace);
+  app.use((_req, res) => {
+    res
+      .status(404)
+      .json({ success: false, error: { code: 'NOT_FOUND', message: 'Route not found' } });
+  });
   const handler: express.ErrorRequestHandler = (error: unknown, _req, res, _next) => {
-    const tooLarge = typeof error === 'object' && error !== null && 'type' in error && error.type === 'entity.too.large';
-    if (tooLarge) { res.status(413).json({ success: false, error: { code: 'PAYLOAD_TOO_LARGE', message: 'Request body exceeds 32 KB' } }); return; }
+    if (error instanceof DomainError) {
+      res
+        .status(error.status)
+        .json({ success: false, error: { code: error.code, message: error.message } });
+      return;
+    }
+    if (error instanceof ZodError) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_INPUT',
+          message: 'Check the submitted fields',
+          fields: error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
+        },
+      });
+      return;
+    }
+    const tooLarge =
+      typeof error === 'object' &&
+      error !== null &&
+      'type' in error &&
+      error.type === 'entity.too.large';
+    if (tooLarge) {
+      res.status(413).json({
+        success: false,
+        error: { code: 'PAYLOAD_TOO_LARGE', message: 'Request body exceeds 32 KB' },
+      });
+      return;
+    }
     const malformed = error instanceof SyntaxError;
-    res.status(malformed ? 400 : 500).json({ success: false, error: { code: malformed ? 'INVALID_JSON' : 'INTERNAL_ERROR', message: malformed ? 'Invalid JSON body' : 'An unexpected error occurred' } });
+    res.status(malformed ? 400 : 500).json({
+      success: false,
+      error: {
+        code: malformed ? 'INVALID_JSON' : 'INTERNAL_ERROR',
+        message: malformed ? 'Invalid JSON body' : 'An unexpected error occurred',
+      },
+    });
   };
   app.use(handler);
   return app;

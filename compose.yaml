@@ -1,0 +1,49 @@
+# Local development foundation only; TLS, MFA and production release checks remain pending.
+services:
+  db:
+    image: postgres:18.1-bookworm
+    environment:
+      POSTGRES_USER: garmentflow_owner
+      POSTGRES_DB: garmentflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a private database owner password in .env}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Set a separate private runtime password in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql
+      - ./infrastructure/init-runtime.sh:/docker-entrypoint-initdb.d/10-runtime.sh:ro
+    ports: ['127.0.0.1:5432:5432']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U garmentflow_owner -d garmentflow']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    command: ['npm', 'run', 'db:migrate', '-w', '@garmentflow/api']
+    environment:
+      MIGRATION_DATABASE_URL: postgresql://garmentflow_owner:${POSTGRES_PASSWORD}@db:5432/garmentflow
+      RUNTIME_DATABASE_ROLE: garmentflow_app
+    depends_on:
+      db: { condition: service_healthy }
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      NODE_ENV: development
+      HOST: 0.0.0.0
+      PORT: 5000
+      DATABASE_URL: postgresql://garmentflow_app:${APP_DB_PASSWORD}@db:5432/garmentflow
+      SESSION_SECRET: ${SESSION_SECRET:?Generate at least 48 random characters locally}
+      CLIENT_URL: http://127.0.0.1:8080
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    ports: ['127.0.0.1:8080:80']
+    depends_on: [api]
+volumes:
+  pgdata:

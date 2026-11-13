@@ -8,7 +8,9 @@ describe('service boundaries', () => {
     expect((await request(app).get('/api/v1/health')).status).toBe(200);
     expect((await request(app).get('/api/v1/ready')).status).toBe(503);
   });
-  it('reports a connected database', async () => { expect((await request(createApp(() => true)).get('/api/v1/ready')).status).toBe(200); });
+  it('reports a connected database', async () => {
+    expect((await request(createApp(() => true)).get('/api/v1/ready')).status).toBe(200);
+  });
   it('returns structured errors and security headers', async () => {
     const result = await request(createApp(() => false)).get('/missing');
     expect(result.status).toBe(404);
@@ -18,14 +20,21 @@ describe('service boundaries', () => {
   });
   it('rejects malformed and oversized request bodies without exposing details', async () => {
     const app = createApp(() => false);
-    const malformed = await request(app).post('/missing').set('Content-Type', 'application/json').send('{');
+    const malformed = await request(app)
+      .post('/missing')
+      .set('Content-Type', 'application/json')
+      .send('{');
     expect(malformed.status).toBe(400);
     expect(malformed.body.error.code).toBe('INVALID_JSON');
-    const oversized = await request(app).post('/missing').send({ value: 'x'.repeat(33000) });
+    const oversized = await request(app)
+      .post('/missing')
+      .send({ value: 'x'.repeat(33000) });
     expect(oversized.status).toBe(413);
     expect(oversized.body.error.code).toBe('PAYLOAD_TOO_LARGE');
   });
   it('rejects invalid database and port configuration', () => {
-    expect(configSchema.safeParse({ MONGODB_URI: 'https://invalid', PORT: 0 }).success).toBe(false);
+    expect(configSchema.safeParse({ DATABASE_URL: 'https://invalid', PORT: 0 }).success).toBe(
+      false,
+    );
   });
 });
